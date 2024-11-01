@@ -12,11 +12,30 @@ app.get("/", (c) => {
   return c.text("Hello Hono!");
 });
 
-app.post("api/v1/signup", (c) => {
+app.post("api/v1/signup", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
-  return c.text("signup post request");
+
+  const body = await c.req.json();
+
+  if (!body.password) {
+    return c.json(
+      {
+        error: "Password is incorrect",
+      },
+      400
+    );
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      password: body.password,
+    },
+  });
+  await prisma.$disconnect();
+
+  return c.json({ message: "User created successfully", userId: user.id }, 201);
 });
 
 app.post("/api/v1/signin", (c) => {
