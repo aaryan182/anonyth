@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { verify } from "hono/jwt";
+import {
+  postCreateSchema,
+  postUpdateSchema,
+  paginationSchema,
+  PostCreate,
+  PostUpdate,
+} from "../zod";
 
 export const blogRouter = new Hono<{
   Bindings: {
@@ -13,7 +20,7 @@ export const blogRouter = new Hono<{
   };
 }>();
 
-// middleware in hono
+// Authorization middleware
 blogRouter.use("/*", async (c, next) => {
   const authHeader = c.req.header("authorization") || "";
   const user = await verify(authHeader, c.env.JWT_SECRET);
@@ -28,7 +35,7 @@ blogRouter.use("/*", async (c, next) => {
 });
 
 blogRouter.post("/", async (c) => {
-  const body = await c.req.json();
+  const body = postCreateSchema.parse(await c.req.json()) as PostCreate;
   const userId = c.get("userId");
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
@@ -42,9 +49,7 @@ blogRouter.post("/", async (c) => {
         authorId: userId,
       },
     });
-    return c.json({
-      id: post.id,
-    });
+    return c.json({ id: post.id });
   } catch (error) {
     c.status(500);
     return c.json({ error: "Error creating post" });
@@ -52,7 +57,7 @@ blogRouter.post("/", async (c) => {
 });
 
 blogRouter.put("/", async (c) => {
-  const body = await c.req.json();
+  const body = postUpdateSchema.parse(await c.req.json()) as PostUpdate;
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
@@ -67,9 +72,7 @@ blogRouter.put("/", async (c) => {
         content: body.content,
       },
     });
-    return c.json({
-      id: post.id,
-    });
+    return c.json({ id: post.id });
   } catch (error) {
     c.status(500);
     return c.json({ error: "Error updating post" });
@@ -81,10 +84,12 @@ blogRouter.get("/bulk", async (c) => {
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
 
-  const page = parseInt(c.req.query("page") || "1", 10);
+  const pagination = paginationSchema.parse({
+    page: c.req.query("page"),
+  });
+  const page = parseInt(pagination.page, 10);
 
   const limit = 6;
-
   const skip = (page - 1) * limit;
 
   const [allBlogs, totalCount] = await Promise.all([
@@ -102,27 +107,4 @@ blogRouter.get("/bulk", async (c) => {
     totalPages: Math.ceil(totalCount / limit),
     allBlogs,
   });
-});
-
-blogRouter.get("/:id", async (c) => {
-  const id = c.req.param("id");
-  const prisma = new PrismaClient({
-    datasourceUrl: c.env.DATABASE_URL,
-  }).$extends(withAccelerate());
-
-  try {
-    const post = await prisma.post.findFirst({
-      where: {
-        id: id,
-      },
-    });
-    if (!post) {
-      c.status(404);
-      return c.json({ error: "Post not found" });
-    }
-    return c.json({ post });
-  } catch (error) {
-    c.status(500);
-    return c.json({ error: "Error retrieving post" });
-  }
 });

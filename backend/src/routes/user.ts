@@ -2,6 +2,12 @@ import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { sign } from "hono/jwt";
+import {
+  userSignupSchema,
+  userSigninSchema,
+  UserSignup,
+  UserSignin,
+} from "../zod";
 
 export const userRouter = new Hono<{
   Bindings: {
@@ -15,7 +21,8 @@ userRouter.post("/signup", async (c) => {
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
 
-  const body = await c.req.json();
+  const body = userSignupSchema.parse(await c.req.json()) as UserSignup;
+
   try {
     const user = await prisma.user.create({
       data: {
@@ -24,7 +31,7 @@ userRouter.post("/signup", async (c) => {
     });
 
     const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
-    return c.json({ jwt: jwt });
+    return c.json({ jwt });
   } catch (e) {
     c.status(403);
     return c.json({ error: "Error while signing up" });
@@ -38,7 +45,7 @@ userRouter.post("/signin", async (c) => {
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
 
-  const body = await c.req.json();
+  const body = userSigninSchema.parse(await c.req.json()) as UserSignin;
 
   try {
     const user = await prisma.user.findUnique({
@@ -47,17 +54,13 @@ userRouter.post("/signin", async (c) => {
       },
     });
 
-    if (!user) {
+    if (!user || body.password !== user.password) {
       c.status(403);
-      return c.json({ error: "User not found" });
+      return c.json({ error: "Invalid credentials" });
     }
 
-    if (body.password !== user.password) {
-      c.status(403);
-      return c.json({ error: "Incorrect password" });
-    }
     const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
-    return c.json({ jwt: jwt });
+    return c.json({ jwt });
   } catch (e) {
     c.status(403);
     return c.json({ error: "Error while signing in" });
