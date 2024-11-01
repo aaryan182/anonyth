@@ -7,7 +7,7 @@ import {
   userSigninSchema,
   UserSignup,
   UserSignin,
-} from "../zod";
+} from "../../../common/src/zod";
 
 export const userRouter = new Hono<{
   Bindings: {
