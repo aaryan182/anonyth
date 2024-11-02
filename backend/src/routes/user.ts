@@ -7,7 +7,7 @@ import {
   userSigninSchema,
   UserSignup,
   UserSignin,
-} from "../../../common/src/zod";
+} from "@aaryanbajaj/anonyth-common";
 
 export const userRouter = new Hono<{
   Bindings: {

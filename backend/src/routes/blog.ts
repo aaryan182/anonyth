@@ -8,7 +8,7 @@ import {
   paginationSchema,
   PostCreate,
   PostUpdate,
-} from "../zod";
+} from "@aaryanbajaj/anonyth-common";
 
 export const blogRouter = new Hono<{
   Bindings: {
